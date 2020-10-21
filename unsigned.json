@@ -1,1 +1,0 @@
-{"type":"core/StdTx","value":{"msg":[{"type":"bank/MsgSend","value":{"from_address":"terra17dps386t0a9kgpxvav0c8u066hqp2td27a2mpt","to_address":"terra17dps386t0a9kgpxvav0c8u066hqp2td27a2mpt","amount":[{"denom":"ukrw","amount":"1970000000"}]}}],"fee":{"amount":[{"denom":"ukrw","amount":"12138809"}],"gas":"100000"},"signatures":[],"memo":""}}
