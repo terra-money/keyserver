@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 
@@ -88,7 +89,7 @@ func (s *Server) BankSend(w http.ResponseWriter, r *http.Request) {
 
 	stdTx := auth.NewStdTx(
 		[]sdk.Msg{bank.MsgSend{FromAddress: sb.Sender, ToAddress: sb.Reciever, Amount: coins}},
-		auth.NewStdFee(client.DefaultGasLimit, feesForSim),
+		auth.NewStdFee(flags.DefaultGasLimit, feesForSim),
 		[]auth.StdSignature{{}},
 		sb.Memo,
 	)
@@ -138,7 +139,7 @@ func (s *Server) BankSend(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 
-			w.Write([]byte(sdk.AppendMsgToErr("failed to load tax rate", err.Error())))
+			w.Write([]byte(sdkerrors.Wrap(err, "failed to load tax rate").Error()))
 			return
 		}
 
@@ -152,7 +153,7 @@ func (s *Server) BankSend(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 
-				w.Write([]byte(sdk.AppendMsgToErr("failed to load tax cap", err.Error())))
+				w.Write([]byte(sdkerrors.Wrap(err, "failed to load tax cap").Error()))
 				return
 			}
 
@@ -165,7 +166,7 @@ func (s *Server) BankSend(w http.ResponseWriter, r *http.Request) {
 		}
 
 		taxes = taxes.Sort()
-		fees = taxes.Add(fees)
+		fees = taxes.Add(fees...)
 	}
 
 	stdTx = auth.NewStdTx(

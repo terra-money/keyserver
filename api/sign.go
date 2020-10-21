@@ -103,12 +103,12 @@ func (s *Server) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sigs := append(stdTx.GetSignatures(), auth.StdSignature{
+	stdTx.Signatures = append(stdTx.Signatures, auth.StdSignature{
 		PubKey:    pubkey,
 		Signature: sigBytes,
 	})
 
-	signedStdTx := auth.NewStdTx(stdTx.GetMsgs(), stdTx.Fee, sigs, stdTx.GetMemo())
+	signedStdTx := auth.NewStdTx(stdTx.GetMsgs(), stdTx.Fee, stdTx.Signatures, stdTx.GetMemo())
 	out, err := cdc.MarshalJSON(signedStdTx)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

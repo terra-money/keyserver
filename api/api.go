@@ -6,8 +6,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gorilla/mux"
-	cmn "github.com/tendermint/tendermint/libs/common"
+	"github.com/tendermint/tendermint/libs/bytes"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
+	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/terra-project/core/app"
 
 	"github.com/terra-project/core/x/treasury"
@@ -77,9 +78,14 @@ func (s *Server) Router() *mux.Router {
 
 // SimulateGas simulates gas for a transaction
 func (s *Server) SimulateGas(txbytes []byte) (res uint64, err error) {
-	result, err := rpcclient.NewHTTP(s.Node, "/websocket").ABCIQueryWithOptions(
+	client, err := rpchttp.New(s.Node, "/websocket")
+	if err != nil {
+		return
+	}
+
+	result, err := client.ABCIQueryWithOptions(
 		"/app/simulate",
-		cmn.HexBytes(txbytes),
+		bytes.HexBytes(txbytes),
 		rpcclient.ABCIQueryOptions{},
 	)
 
@@ -91,8 +97,8 @@ func (s *Server) SimulateGas(txbytes []byte) (res uint64, err error) {
 		return 0, errors.New(result.Response.Log)
 	}
 
-	var simulationResult sdk.Result
-	if err := cdc.UnmarshalBinaryLengthPrefixed(result.Response.Value, &simulationResult); err != nil {
+	var simulationResult sdk.SimulationResponse
+	if err := cdc.UnmarshalBinaryBare(result.Response.Value, &simulationResult); err != nil {
 		return 0, err
 	}
 
@@ -101,7 +107,12 @@ func (s *Server) SimulateGas(txbytes []byte) (res uint64, err error) {
 
 // LoadTaxRate load tax-rate
 func (s *Server) LoadTaxRate() (res sdk.Dec, err error) {
-	result, err := rpcclient.NewHTTP(s.Node, "/websocket").ABCIQueryWithOptions(
+	client, err := rpchttp.New(s.Node, "/websocket")
+	if err != nil {
+		return
+	}
+
+	result, err := client.ABCIQueryWithOptions(
 		"custom/treasury/taxRate",
 		[]byte{},
 		rpcclient.ABCIQueryOptions{},
@@ -130,9 +141,14 @@ func (s *Server) LoadTaxCap(denom string) (res sdk.Int, err error) {
 		return sdk.ZeroInt(), err
 	}
 
-	result, err := rpcclient.NewHTTP(s.Node, "/websocket").ABCIQueryWithOptions(
+	client, err := rpchttp.New(s.Node, "/websocket")
+	if err != nil {
+		return
+	}
+
+	result, err := client.ABCIQueryWithOptions(
 		"custom/treasury/taxCap",
-		cmn.HexBytes(bz),
+		bytes.HexBytes(bz),
 		rpcclient.ABCIQueryOptions{},
 	)
 	if err != nil {
@@ -143,10 +159,10 @@ func (s *Server) LoadTaxCap(denom string) (res sdk.Int, err error) {
 		return sdk.ZeroInt(), errors.New(result.Response.Log)
 	}
 
-	var taxRate sdk.Int
-	if err := cdc.UnmarshalJSON(result.Response.Value, &taxRate); err != nil {
+	var taxCap sdk.Int
+	if err := cdc.UnmarshalJSON(result.Response.Value, &taxCap); err != nil {
 		return sdk.ZeroInt(), err
 	}
 
-	return taxRate, nil
+	return taxCap, nil
 }
