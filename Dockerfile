@@ -1,41 +1,34 @@
-FROM golang:alpine AS build-env
+FROM cosmwasm/go-ext-builder:0.8.2-alpine AS rust-builder
 
-# Injest build args from Makefile
-ARG BINARY
-ARG GITHUB_USERNAME
-ARG GOARCH
-ENV BINARY=${BINARY}
-
-# Set up dependencies
-ENV PACKAGES make git curl
-
-# Set working directory for the build
 WORKDIR /go/src/github.com/${GITHUB_USERNAME}/${BINARY}
 
-# Install dependencies
-RUN apk add --update $PACKAGES
+COPY go.* /go/src/github.com/${GITHUB_USERNAME}/${BINARY}/
 
-# Install dep
-RUN curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+RUN apk add --no-cache git \
+    && go mod download github.com/CosmWasm/go-cosmwasm \
+    && export GO_WASM_DIR=$(go list -f "{{ .Dir }}" -m github.com/CosmWasm/go-cosmwasm) \
+    && cd ${GO_WASM_DIR} \
+    && cargo build --release --features backtraces --example muslc \
+    && mv ${GO_WASM_DIR}/target/release/examples/libmuslc.a /lib/libgo_cosmwasm_muslc.a
 
-# Force the go compiler to use modules 
-ENV GO111MODULE=on
 
-# Add source files
+FROM cosmwasm/go-ext-builder:0.8.2-alpine AS go-builder
+
+WORKDIR /go/src/github.com/${GITHUB_USERNAME}/${BINARY}
+
+RUN apk add --no-cache git libusb-dev linux-headers
+
 COPY . .
+COPY --from=rust-builder /lib/libgo_cosmwasm_muslc.a /lib/libgo_cosmwasm_muslc.a
 
-# Make the binary
-RUN make install
+# force it to use static lib (from above) not standard libgo_cosmwasm.so file
+RUN BUILD_TAGS=muslc make build
 
-# Final image
-FROM alpine:edge
 
-# Install ca-certificates
-RUN apk add --update ca-certificates
+FROM alpine:3
+
 WORKDIR /root
 
-# Copy over binaries from the build-env
-COPY --from=build-env /go/bin/${BINARY} /usr/bin/${BINARY}
+COPY --from=go-builder /go/src/github.com/${GITHUB_USERNAME}/${BINARY}/build/${BINARY} /usr/local/bin/${BINARY}
 
-# Run ${BINARY} by default
-CMD ${BINARY}
+CMD [ "terrad", "--help" ]

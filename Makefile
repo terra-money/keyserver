@@ -1,10 +1,10 @@
 BINARY            = keyserver
 GITHUB_USERNAME   = terra-project
 DOCKER_REPO       = quay.io/terra_project
-VERSION           = v0.2.0
+VERSION           = v0.4.0
 GOARCH            = amd64
 ARTIFACT_DIR      = build
-PORT 							= 3000
+PORT              = 3000
 
 COMMIT=$(shell git rev-parse HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
@@ -16,28 +16,34 @@ DOCKER_IMAGE=${DOCKER_REPO}/${BINARY}
 
 # Setup the -ldflags option for go build here, interpolate the variable values
 LDFLAGS = -ldflags "-X ${FLAG_PATH}.Version=${VERSION} -X ${FLAG_PATH}.Commit=${COMMIT} -X ${FLAG_PATH}.Branch=${BRANCH}"
+BUILD_FLAGS = -tags "${BUILD_TAGS}"
 
 # Build the project
-all: clean linux darwin windows
+all: clean install
+
+# Build project into ./build
+build:
+	go build ${BUILD_FLAGS} ${LDFLAGS} -o ${ARTIFACT_DIR}/ ./...
 
 # Build and Install project into GOPATH using current OS setup
 install:
-	go install ${LDFLAGS} ./...
+	go install ${BUILD_FLAGS} ${LDFLAGS} ./...
 
 test:
 	go test -v ./api/...
 
 # Build binary for Linux
-linux: clean
-	GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${ARTIFACT_DIR}/${BINARY}-linux-${GOARCH} . ;
-
-# Build binary for MacOS
-darwin:
-	GOOS=darwin GOARCH=${GOARCH} go build ${LDFLAGS} -o ${ARTIFACT_DIR}/${BINARY}-darwin-${GOARCH} . ;
-
-# Build binary for Windows
-windows:
-	GOOS=windows GOARCH=${GOARCH} go build ${LDFLAGS} -o ${ARTIFACT_DIR}/${BINARY}-windows-${GOARCH}.exe . ;
+build-linux: clean
+	mkdir -p ./build
+	docker build \
+	    --build-arg BINARY=${BINARY} \
+		--build-arg GITHUB_USERNAME=${GITHUB_USERNAME} \
+		--build-arg GOARCH=${GOARCH} \
+	    --tag ${DOCKER_IMAGE} \
+		.
+	docker create --name temp ${DOCKER_IMAGE}:latest
+	docker cp temp:/usr/local/bin/${BINARY} ${ARTIFACT_DIR}/
+	docker rm temp
 
 # Install golang dependencies
 
@@ -66,4 +72,4 @@ docker-run:
 clean:
 	rm -rf ${ARTIFACT_DIR}/*
 
-.PHONY: linux darwin fmt clean
+.PHONY: linux darwin fmt clean build
